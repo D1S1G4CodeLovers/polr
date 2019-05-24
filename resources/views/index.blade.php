@@ -6,7 +6,11 @@
 
 @section('content')
 <h1 class='title'>{{env('APP_NAME')}}</h1>
-
+@if (!session('username'))
+<div>
+    <h3><a href="{{ route('login') }}">Login</a> to use our service</h3>
+</div>
+@else
 <form method='POST' action='/shorten' role='form'>
     <input type='url' autocomplete='off'
         class='form-control long-link-input' placeholder='http://' name='link-url' />
@@ -45,8 +49,8 @@
 <div id='tips' class='text-muted tips'>
     <i class='fa fa-spinner'></i> Loading Tips...
 </div>
+@endif
 @endsection
-
 @section('js')
 <script src='js/index.js'></script>
 @endsection

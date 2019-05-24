@@ -17,7 +17,7 @@ class UserFactory {
 
         $user = new User;
         $user->username = $username;
-        $user->password = $hashed_password;
+        $user->password = $password ? $hashed_password : null;
         $user->email = $email;
         $user->recovery_key = $recovery_key;
         $user->active = $active;
@@ -29,5 +29,4 @@ class UserFactory {
         $user->save();
         return $user;
     }
-
 }
