@@ -40,7 +40,7 @@ class UserHelper {
             ->where('username', $username)
             ->first();
 
-        if ($user == null) {
+        if ($user == null || !$user->password) {
             return false;
         }
 

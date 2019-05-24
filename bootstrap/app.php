@@ -19,10 +19,33 @@ $app = new Laravel\Lumen\Application(
     realpath(__DIR__.'/../')
 );
 
+/*
+|--------------------------------------------------------------------------
+| Class Aliases
+|--------------------------------------------------------------------------
+|
+| Register alias of class.
+|
+*/
+
+class_alias(Laravel\Socialite\Facades\Socialite::class, 'Socialite');
+
 $app->withFacades();
 $app->withEloquent();
 
+
+/*
+|--------------------------------------------------------------------------
+| App configuration
+|--------------------------------------------------------------------------
+|
+| Register config.
+|
+*/
+
 $app->configure('geoip');
+$app->configure('services');
+$app->configure('const');
 
 /*
 |--------------------------------------------------------------------------
@@ -82,6 +105,7 @@ $app->routeMiddleware([
 $app->register(App\Providers\AppServiceProvider::class);
 $app->register(\Yajra\Datatables\DatatablesServiceProvider::class);
 $app->register(\Torann\GeoIP\GeoIPServiceProvider::class);
+$app->register(\Laravel\Socialite\SocialiteServiceProvider::class);
 // $app->register(App\Providers\EventServiceProvider::class);
 
 /*

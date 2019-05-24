@@ -76,3 +76,8 @@ $app->group(['prefix' => '/api/v2', 'namespace' => 'App\Http\Controllers\Api', '
     $app->get('data/link', ['as' => 'api_link_analytics', 'uses' => 'ApiAnalyticsController@lookupLinkStats']);
     $app->post('data/link', ['as' => 'api_link_analytics', 'uses' => 'ApiAnalyticsController@lookupLinkStats']);
 });
+
+$app->group(['prefix' => '/auth', 'namespace' => 'App\Http\Controllers'], function ($app) {
+    $app->get('/admin/googleAuth', ['as' => 'googleAuth', 'uses' => 'AuthController@redirectToGoogle']);
+    $app->get('/callback/google', ['as' => 'googleCallback', 'uses' => 'AuthController@handleGoogleCallback']);
+});

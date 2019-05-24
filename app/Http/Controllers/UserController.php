@@ -2,13 +2,14 @@
 namespace App\Http\Controllers;
 use Mail;
 use Hash;
-use App\Models\User;
 use Illuminate\Http\Request;
+use Validator;
 
 use App\Helpers\CryptoHelper;
 use App\Helpers\UserHelper;
 
 use App\Factories\UserFactory;
+use Laravel\Socialite\Facades\Socialite;
 
 class UserController extends Controller {
     /**
@@ -17,10 +18,18 @@ class UserController extends Controller {
      * @return Response
      */
     public function displayLoginPage(Request $request) {
+        if ($request->session()->has('username') && $request->session()->has('role')) {
+            return redirect(route('index'));
+        }
+
         return view('login');
     }
 
     public function displaySignupPage(Request $request) {
+        if (!$request->session()->has('user')) {
+            return redirect(route('login'))->with('error', 'Something went wrong!');
+        }
+
         return view('signup');
     }
 
@@ -53,6 +62,13 @@ class UserController extends Controller {
         }
     }
 
+    /**
+     * Sign up user
+     *
+     * @param  Request $request
+     *
+     * @return mixed
+     */
     public function performSignup(Request $request) {
         if (env('POLR_ALLOW_ACCT_CREATION') == false) {
             return redirect(route('index'))->with('error', 'Sorry, but registration is disabled.');
@@ -63,70 +79,55 @@ class UserController extends Controller {
             $gRecaptchaResponse = $request->input('g-recaptcha-response');
 
             $recaptcha = new \ReCaptcha\ReCaptcha(env('POLR_RECAPTCHA_SECRET_KEY'));
-            $recaptcha_resp = $recaptcha->verify($gRecaptchaResponse, $request->ip());
+            $recaptchaResp = $recaptcha->verify($gRecaptchaResponse, $request->ip());
 
-            if (!$recaptcha_resp->isSuccess()) {
+            if (!$recaptchaResp->isSuccess()) {
                 return redirect(route('signup'))->with('error', 'You must complete the reCAPTCHA to register.');
             }
         }
 
+        $inputs = $request->input();
+        $userSocialite = Socialite::driver($inputs['auth_type'])->userFromToken($inputs['auth_token']);
+        $userSocialite->authType = $inputs['auth_type'];
+
         // Validate signup form data
-        $this->validate($request, [
-            'username' => 'required|alpha_dash',
-            'password' => 'required',
-            'email' => 'required|email'
+        $validator = Validator::make($request->all(), [
+            'username' => 'required|unique:users|alpha_dash'
         ]);
 
-        $username = $request->input('username');
-        $password = $request->input('password');
-        $email = $request->input('email');
-
-        if (env('SETTING_RESTRICT_EMAIL_DOMAIN')) {
-            $email_domain = explode('@', $email)[1];
-            $permitted_email_domains = explode(',', env('SETTING_ALLOWED_EMAIL_DOMAINS'));
-
-            if (!in_array($email_domain, $permitted_email_domains)) {
-                return redirect(route('signup'))->with('error', 'Sorry, your email\'s domain is not permitted to create new accounts.');
-            }
+        if ($validator->fails()) {
+            return redirect(route('signup'))
+                ->withErrors($validator)
+                ->with('user', $userSocialite);
         }
 
         $ip = $request->ip();
+        $acctActivationNeeded = env('POLR_ACCT_ACTIVATION');
 
-        $user_exists = UserHelper::userExists($username);
-        $email_exists = UserHelper::emailExists($email);
-
-        if ($user_exists || $email_exists) {
-            // if user or email email
-            return redirect(route('signup'))->with('error', 'Sorry, your email or username already exists. Try again.');
-        }
-
-        $acct_activation_needed = env('POLR_ACCT_ACTIVATION');
-
-        if ($acct_activation_needed == false) {
+        if ($acctActivationNeeded == false) {
             // if no activation is necessary
             $active = 1;
             $response = redirect(route('login'))->with('success', 'Thanks for signing up! You may now log in.');
-        }
-        else {
+        } else {
             // email activation is necessary
-            $response = redirect(route('login'))->with('success', 'Thanks for signing up! Please confirm your email to continue.');
             $active = 0;
+            $response = redirect(route('login'))->with('success', 'Thanks for signing up! Please confirm your email to continue.');
         }
 
-        $api_active = false;
-        $api_key = null;
+        $apiActive = false;
+        $apiKey = null;
 
         if (env('SETTING_AUTO_API')) {
             // if automatic API key assignment is on
-            $api_active = 1;
-            $api_key = CryptoHelper::generateRandomHex(env('_API_KEY_LENGTH'));
+            $apiActive = 1;
+            $apiKey = CryptoHelper::generateRandomHex(env('_API_KEY_LENGTH'));
         }
 
-        $user = UserFactory::createUser($username, $email, $password, $active, $ip, $api_key, $api_active);
+        $user = UserFactory::createUser($inputs['username'], $userSocialite->email, null, $active, $ip, $apiKey, $apiActive);
 
-        if ($acct_activation_needed) {
+        if ($acctActivationNeeded) {
             Mail::send('emails.activation', [
-                'username' => $username, 'recovery_key' => $user->recovery_key, 'ip' => $ip
+                'username' => $user->username, 'recovery_key' => $user->recovery_key, 'ip' => $ip
             ], function ($m) use ($user) {
                 $m->from(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
 
@@ -202,5 +203,4 @@ class UserController extends Controller {
         }
 
     }
-
 }
